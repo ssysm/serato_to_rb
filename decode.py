@@ -1,6 +1,7 @@
 import base64
 import struct
 import mutagen
+import logging
 from CuePoint import CuePoint, CuePointCollection, CuePointNotFoundException, NotACuePointFileException
 from kMarkerTags import marker_tags
 
@@ -16,9 +17,7 @@ def extract_m4a_tags(tag_data):
 
 
 def extract_tag_base64(tag_bytes):
-    base64_start_position = tag_bytes.find(b'Markers2\x00\x01')
-    base64_end_position = tag_bytes.find(b'A\x00\x00\x00')
-    base64_extracted = tag_bytes[base64_start_position + 11: base64_end_position + 1]
+    base64_extracted = tag_bytes[2: len(tag_bytes) - 1]
     base64_str = base64_extracted.decode('utf-8')
     base64_str = base64_str.replace('\n', '')
     return base64_str
@@ -41,7 +40,6 @@ def extract_cue_points(filename: str) -> CuePointCollection:
     base64_str = extract_tag_base64(markers_tag_data)
     base64_decoded = base64.b64decode(base64_str)
     hex_array = bytearray(base64_decoded)
-
     cue_points = CuePointCollection(filename)
     last_cue_position = hex_array.find(b'CUE')
     if last_cue_position < 0:
@@ -50,15 +48,15 @@ def extract_cue_points(filename: str) -> CuePointCollection:
 
     while True:
         cue_length = hex_array[last_cue_position + 7]
-        if cue_length != 13:
-            print('got an named cue')
+        if cue_length != 13: # named cue
+            logging.debug('got an named cue')
         cue_index = int(hex_array[last_cue_position + 9])
         cue_position = int(struct.unpack('>I', hex_array[last_cue_position + 10:last_cue_position + 14])[0])
         cue_color = hex_array[last_cue_position + 16:last_cue_position + 19]
         next_cue_position = hex_array.find(b'CUE', last_cue_position + 1)  # find the next cue
         if next_cue_position < 0 and cue_length != 13:
             bpm_lock_pos = hex_array.find(b'\x42\x50\x4d\x4c\x4f\x43\x4b', last_cue_position)
-            cue_text = hex_array[last_cue_position + 20:bpm_lock_pos - 1]
+            cue_text = hex_array[last_cue_position + 20:bpm_lock_pos]
         elif cue_length != 13:
             cue_text = hex_array[last_cue_position + 20: next_cue_position - 1]
         else:
@@ -66,7 +64,7 @@ def extract_cue_points(filename: str) -> CuePointCollection:
         cue_point = CuePoint(cue_length, cue_index, cue_position, cue_color.hex(), cue_text.decode('utf-8'))
         cue_points.add_new_cue_point(cue_point)
         last_cue_position = next_cue_position
-        if last_cue_position < 0:  # no more que
+        if last_cue_position < 0:  # no more cue
             break
 
     return cue_points

@@ -29,6 +29,8 @@ if __name__ == '__main__':
     rdb_xml = rekordbox_collection_generator.generate(tracks_collection)
 
     with open('rekordbox.xml', 'w', encoding='utf-8') as fd:
+        fd.write('<!-- How to import rekordbox.xml: https://www.choones.app/blog/2019-08-30/importing-and-exporting-rekordbox-xml -->')
         fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
         fd.write(rdb_xml.decode('utf-8'))
         fd.close()
+    print(str(len(tracks)) + ' tracks done')
